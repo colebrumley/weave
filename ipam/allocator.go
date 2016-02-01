@@ -209,18 +209,22 @@ func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled
 	return result.addr, result.err
 }
 
-// Lookup (Sync) - get existing IP address for container with given name in range
-func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
-	resultChan := make(chan allocateResult)
+// Lookup (Sync) - get existing IP addresses for container with given name in range
+func (alloc *Allocator) Lookup(ident string, r address.Range) ([]address.Address, error) {
+	type lookupResult struct {
+		addrs []address.Address
+		err   error
+	}
+	resultChan := make(chan lookupResult)
 	alloc.actionChan <- func() {
-		if addr, found := alloc.ownedInRange(ident, r); found {
-			resultChan <- allocateResult{addr: addr}
+		if addrs := alloc.ownedInRange(ident, r); len(addrs) > 0 {
+			resultChan <- lookupResult{addrs: addrs}
 			return
 		}
-		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
+		resultChan <- lookupResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
 	}
 	result := <-resultChan
-	return result.addr, result.err
+	return result.addrs, result.err
 }
 
 // Claim an address that we think we should own (Sync)
@@ -867,13 +871,14 @@ func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bo
 	return false
 }
 
-func (alloc *Allocator) ownedInRange(ident string, r address.Range) (address.Address, bool) {
+func (alloc *Allocator) ownedInRange(ident string, r address.Range) []address.Address {
+	var a []address.Address
 	for _, addr := range alloc.owned[ident] {
 		if r.Contains(addr) {
-			return addr, true
+			a = append(a, addr)
 		}
 	}
-	return 0, false
+	return a
 }
 
 func (alloc *Allocator) findOwner(addr address.Address) string {
