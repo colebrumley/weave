@@ -211,20 +211,11 @@ func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled
 
 // Lookup (Sync) - get existing IP addresses for container with given name in range
 func (alloc *Allocator) Lookup(ident string, r address.Range) ([]address.Address, error) {
-	type lookupResult struct {
-		addrs []address.Address
-		err   error
-	}
-	resultChan := make(chan lookupResult)
+	resultChan := make(chan []address.Address)
 	alloc.actionChan <- func() {
-		if addrs := alloc.ownedInRange(ident, r); len(addrs) > 0 {
-			resultChan <- lookupResult{addrs: addrs}
-			return
-		}
-		resultChan <- lookupResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
+		resultChan <- alloc.ownedInRange(ident, r)
 	}
-	result := <-resultChan
-	return result.addrs, result.err
+	return <-resultChan, nil
 }
 
 // Claim an address that we think we should own (Sync)
