@@ -783,7 +783,7 @@ func (alloc *Allocator) persistRing() {
 }
 
 func (alloc *Allocator) loadPersistedRing() {
-	var checkPeerName mesh.PeerName
+	checkPeerName := alloc.ourName
 	if err := alloc.db.Load(nameIdent, &checkPeerName); err != nil {
 		alloc.fatalf("Error loading persisted peer name: %s", err)
 		return
