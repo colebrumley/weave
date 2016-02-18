@@ -217,11 +217,30 @@ func (router *NetworkRouter) persistPeers() {
 	}
 }
 
-func (router *NetworkRouter) SetInitialPeers(peers []string) []error {
-	// Load is a no-op if persistence entry has never been saved
-	if err := router.db.Load(peersIdent, &peers); err != nil {
-		return []error{err}
+func (router *NetworkRouter) SetInitialPeers(peers []string) ([]string, []error) {
+	var storedPeers []string
+	if err := router.db.Load(peersIdent, &storedPeers); err != nil {
+		return nil, []error{err}
 	}
-	log.Println("Initiating connections to peers:", peers)
-	return router.ConnectionMaker.InitiateConnections(peers, false)
+
+	if !equal(peers, storedPeers) {
+		log.Println("Overriding command-line peer list with stored list:", peers)
+	} else {
+		log.Println("Command line peers:", peers)
+	}
+	errs := router.ConnectionMaker.InitiateConnections(peers, false)
+	router.persistPeers()
+	return peers, errs
+}
+
+func equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }

@@ -127,7 +127,6 @@ func main() {
 	}
 
 	Log.Println("Command line options:", options())
-	Log.Println("Command line peers:", peers)
 
 	if prof != "" {
 		p := *profile.CPUProfile
@@ -191,17 +190,6 @@ func main() {
 	}
 
 	var (
-		allocator     *ipam.Allocator
-		defaultSubnet address.CIDR
-	)
-	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), db, isKnownPeer)
-		observeContainers(allocator)
-	} else if peerCount > 0 {
-		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
-	}
-
-	var (
 		ns        *nameserver.Nameserver
 		dnsserver *nameserver.DNSServer
 	)
@@ -215,8 +203,20 @@ func main() {
 	}
 
 	router.Start()
-	if errors := router.SetInitialPeers(peers); len(errors) > 0 {
+	initialPeers, errors := router.SetInitialPeers(peers)
+	if len(errors) > 0 {
 		Log.Fatal(ErrorMessages(errors))
+	}
+
+	var (
+		allocator     *ipam.Allocator
+		defaultSubnet address.CIDR
+	)
+	if iprangeCIDR != "" {
+		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, initialPeers), db, isKnownPeer)
+		observeContainers(allocator)
+	} else if peerCount > 0 {
+		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}
 
 	// The weave script always waits for a status call to succeed,
