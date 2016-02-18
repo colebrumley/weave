@@ -45,7 +45,7 @@ type operation interface {
 // necessary plumbing.  Runs as a single-threaded Actor, so no locks
 // are used around data structures.
 type Allocator struct {
-	actionChan       chan<- func()
+	actionChan       chan func()
 	ourName          mesh.PeerName
 	universe         address.Range                // superset of all ranges
 	ring             *ring.Ring                   // information on ranges owned by all peers
@@ -68,6 +68,7 @@ type Allocator struct {
 // NewAllocator creates and initialises a new Allocator
 func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, db db.DB, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
 	return &Allocator{
+		actionChan:  make(chan func(), mesh.ChannelSize),
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
@@ -84,10 +85,8 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
 	alloc.loadPersistedRing()
-	actionChan := make(chan func(), mesh.ChannelSize)
-	alloc.actionChan = actionChan
 	alloc.ticker = time.NewTicker(tickInterval)
-	go alloc.actorLoop(actionChan)
+	go alloc.actorLoop(alloc.actionChan)
 }
 
 // Stop makes the actor routine exit, for test purposes ONLY because any
